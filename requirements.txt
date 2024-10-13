@@ -1,0 +1,5 @@
+Flask
+Pillow
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-Login
