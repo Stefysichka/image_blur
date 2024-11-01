@@ -3,12 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home</title>
+    <title>Image Upload Progress</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { font-family: Arial, sans-serif; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+    </style>
 </head>
 <body>
-    <h1>Welcome to the Image Upload App</h1>
+    <h1>Image Upload Progress</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Task ID</th>
+                <th>Filename</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+            <tr>
+                <td>{{ task[0] }}</td>
+                <td>{{ task[1] }}</td>
+                <td>{{ task[2] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
     <p>
-        <a href="/upload">Upload an Image</a>
+        <a href="/upload">Upload a new image</a>
     </p>
 </body>
 </html>

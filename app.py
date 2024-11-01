@@ -1,101 +1,172 @@
-from flask import Flask, render_template, request, redirect, url_for
-from flask_sqlalchemy import SQLAlchemy
-import os
-from PIL import Image  # For image processing
-from werkzeug.utils import secure_filename  # For secure file uploads
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import psycopg2
+import os
+from werkzeug.utils import secure_filename
+from PIL import Image, ImageFilter
+import io
+import threading
+import time
+import logging
+from datetime import datetime
 
-# Try to connect to the PostgreSQL database
-try:
-    conn = psycopg2.connect("postgresql://postgres:09031993@localhost/image_uploads")
-    print("Connection successful")
-except Exception as e:
-    print(f"Error: {e}")
-
-# Initialize Flask app
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:09031993@localhost/image_uploads'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
+app.secret_key = 'your_secret_key'
+app.config['UPLOAD_FOLDER'] = 'uploads/'
+app.config['PROCESSED_FOLDER'] = 'static/processed_images/'
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)  
+os.makedirs(app.config['PROCESSED_FOLDER'], exist_ok=True) 
 
-# Model to store task history
-class Task(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    image_path = db.Column(db.String(100), nullable=False)
-    status = db.Column(db.String(20), nullable=False)
+processing_thread = None
+cancel_processing = False
+progress_percentage = 0  
+image_status = {} 
 
-# Create the database
-with app.app_context():
-    db.create_all()
 
-# Folder to store uploaded images
-UPLOAD_FOLDER = 'static/uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+def connect_db():
+    return psycopg2.connect(
+        host="localhost",
+        database="image_uploads",
+        user="postgres",  
+        password="09031993"  
+    )
 
-# Allowed file formats
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+@app.route('/')
+def index():
+    if 'username' not in session: 
+        return redirect(url_for('login'))  
+    conn = connect_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM uploads ORDER BY created_at DESC")
+    tasks = cur.fetchall()
+    conn.close()
+    return render_template('index.html', tasks=tasks)
 
-# Function to check if file has an allowed extension
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-# Maximum file size (in MB) and max dimensions for images
-MAX_FILE_SIZE_MB = 10
-MAX_IMAGE_DIMENSIONS = (4000, 4000)
-
-# Function to check if file size is allowed
-def allowed_file_size(filepath):
-    return os.stat(filepath).st_size <= MAX_FILE_SIZE_MB * 1024 * 1024
-
-# Function to check if image dimensions are allowed
-def allowed_image_dimensions(image):
-    return image.width <= MAX_IMAGE_DIMENSIONS[0] and image.height <= MAX_IMAGE_DIMENSIONS[1]
-
-# Route for uploading files
-@app.route('/upload', methods=['GET', 'POST'])
-def upload_file():
+@app.route('/login', methods=['GET', 'POST'])
+def login():
     if request.method == 'POST':
-        # Check if a file is present in the request
-        if 'file' not in request.files:
-            return redirect(request.url)
+        username = request.form['username']
+        password = request.form['password']
+        
+        conn = connect_db()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users WHERE username=%s AND password=%s", (username, password))
+        user = cur.fetchone()
+        conn.close()
+
+        if user:
+            session['username'] = username
+            return redirect(url_for('upload'))
+        else:
+            flash('Invalid credentials. Please try again.')
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        conn = connect_db()
+        cur = conn.cursor()
+
+        cur.execute("SELECT * FROM users WHERE username=%s", (username,))
+        existing_user = cur.fetchone()
+        
+        if existing_user:
+            flash('Username already exists. Please choose a different one.')
+            return redirect(url_for('register'))
+
+        cur.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, password))
+        conn.commit()
+        conn.close()
+        flash('Registration successful! You can now log in.')
+        return redirect(url_for('login'))
+
+    return render_template('register.html')
+
+logging.basicConfig(level=logging.DEBUG)
+
+def process_image(filepath, blur_amount, filter_type):
+    global cancel_processing, progress_percentage, image_status
+    image = Image.open(filepath)
+    processed_image = image
+
+    task_id = os.path.basename(filepath)  # Unique ID based on the file name
+    image_status[task_id] = {'progress': 0, 'path': None}  # Initialize status
+
+    for i in range(1, blur_amount + 1):
+        if cancel_processing:
+            image_status[task_id]['progress'] = 'Cancelled'
+            return None
+        
+        time.sleep(0.1)
+        progress_percentage = int((i / blur_amount) * 100)
+        image_status[task_id]['progress'] = progress_percentage  # Update progress
+
+        if filter_type == 'gaussian':
+            processed_image = processed_image.filter(ImageFilter.GaussianBlur(i))
+        elif filter_type == 'median':
+            processed_image = processed_image.filter(ImageFilter.MedianFilter(size=i))
+
+    final_image_path = os.path.join(app.config['PROCESSED_FOLDER'], f'processed_{task_id}')
+    processed_image.save(final_image_path)
+
+    image_status[task_id] = {'progress': 100, 'path': final_image_path}  # Final status
+    logging.debug(f'Processed image path: {final_image_path}')
+    return final_image_path
+
+
+@app.route('/status/<task_id>', methods=['GET'])
+def status(task_id):
+    global image_status
+    if task_id in image_status:
+        status = image_status[task_id]
+        return jsonify({
+            'processing': status['progress'] < 100,
+            'progress': status['progress'],
+            'image_path': status['path']
+        })
+    return jsonify({'error': 'Task not found'})
+
+@app.route('/upload', methods=['GET', 'POST'])
+def upload():
+    global processing_thread, cancel_processing
+    if request.method == 'POST':
         file = request.files['file']
-        
-        # If no file is selected
-        if file.filename == '':
-            return redirect(request.url)
-        
-        # If the file is of an allowed format
-        if file and allowed_file(file.filename):
+        if file:
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
 
-            # Check file size and dimensions
-            if not allowed_file_size(filepath):
-                return "File size exceeds the limit."
-            
-            image = Image.open(filepath)
-            if not allowed_image_dimensions(image):
-                return "Image dimensions are too large."
+            blur_amount = request.form.get('blurLevel', type=int)
+            filter_type = request.form.get('filter', type=str)
 
-            # Scale the image (reduce size by 50%)
-            scaled_image = image.resize((int(image.width * 0.5), int(image.height * 0.5)))
-            scaled_filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'scaled_' + filename)
-            scaled_image.save(scaled_filepath)
+            task_id = filename 
+            cancel_processing = False
+            processing_thread = threading.Thread(target=process_image, args=(filepath, blur_amount, filter_type))
+            processing_thread.start()
 
-            # Add task to the database
-            new_task = Task(image_path=scaled_filepath, status='Completed')
-            db.session.add(new_task)
-            db.session.commit()
+            return jsonify({'status': 'Processing started', 'task_id': task_id})
+    return render_template('upload.html')
 
-            return redirect(url_for('home'))  # Redirect to home after successful upload
-    return render_template('upload.html')  # Render the upload form
+@app.route('/cancel', methods=['POST'])
+def cancel():
+    global cancel_processing
+    cancel_processing = True
+    return jsonify(success=True)
 
-# Home route
-@app.route('/')
-def home():
-    return render_template('index.html')
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    flash('You have been logged out.')
+    return redirect(url_for('login'))
 
-# Run the Flask app
-if __name__ == "__main__":
+@app.route('/routes')
+def show_routes():
+    output = []
+    for rule in app.url_map.iter_rules():
+        output.append(f"{rule.endpoint}: {rule.rule}")
+    return "<br>".join(output)
+
+if __name__ == '__main__':
     app.run(debug=True, port=8080)
