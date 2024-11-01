@@ -5,16 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        body { font-family: Arial, sans-serif; }
-        .container { max-width: 400px; margin: auto; padding: 20px; }
-        h2 { text-align: center; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; }
-        .form-group input { width: 100%; padding: 8px; }
-        .btn { display: block; width: 100%; padding: 10px; background-color: #007BFF; color: white; border: none; cursor: pointer; }
-        .btn:hover { background-color: #0056b3; }
-    </style>
 </head>
 <body>
     <div class="container">
@@ -37,8 +27,9 @@
                 <label for="password">Password:</label>
                 <input type="password" id="password" name="password" required>
             </div>
-            <button type="submit" class="btn">Register</button>
+            <button type="submit" class="special-button">Register</button>
         </form>
+        <p>Already have an account? <a href="{{ url_for('login') }}">Click here</a></p>
     </div>
 </body>
 </html>
