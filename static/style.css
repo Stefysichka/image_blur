@@ -11,69 +11,67 @@ body {
     padding: 20px;
 }
 
-h1{
-    color: #7C7A7A; /* Updated heading color */
+h1 {
+    color: #7C7A7A;
     font-size: 2rem;
     margin-top: 0;
     text-align: center;
-    margin-bottom: 10px;
     margin-bottom: 20px;
 }
+
 h2 {
-    color: #7C7A7A; /* Updated heading color */
+    color: #7C7A7A;
     font-size: 2rem;
     margin-top: 0;
     text-align: center;
-    margin-bottom: 10px;
     margin-bottom: 20px;
 }
+
 label {
-    display: block; /* Makes the label take the full width */
-    text-align: left; /* Aligns the label text to the left */
-    margin-bottom: 5px; /* Adds a small space between the label and the input */
-    font-size: 1rem; /* Keeps the font size appropriate */
+    display: block;
+    text-align: left;
+    margin-bottom: 5px;
+    font-size: 1rem;
 }
-/* Add this to your existing CSS */
+
 .file-label {
     display: block;
-    text-align: left; /* Align text to the left */
-    margin-bottom: 5px; /* Adds space below the label */
-    font-size: 1rem; /* Keep the font size consistent */
+    text-align: left;
+    margin-bottom: 5px;
+    font-size: 1rem;
 }
 
 .custom-file-upload {
-    display: block; /* Зробити елемент блочним для повної ширини */
-    width: 100%; /* Зробити такою ж ширини, як і інші поля */
-    padding: 0.8rem; /* Уніфікований відступ */
-    border: 2px solid #150B0B; /* Без кордонів */
-    border-radius: 4px; /* Заокруглення кутів */
-    background-color: #FFFFFF; /* Колір фону, як у кнопок */
-    color: #150B0B; /* Колір тексту */
-    font-size: 1rem; /* Розмір шрифту */
-    cursor: pointer; /* Зміна курсора при наведенні */
-    box-sizing: border-box; /* Для правильного врахування відступів і рамок */
-    margin: 1rem 0; /* Відступи для елементів */
-    transition: background-color 0.3s; /* Анімація для зміни кольору фону */
+    display: block;
+    width: 100%;
+    padding: 0.8rem;
+    border: 2px solid #150B0B;
+    border-radius: 4px;
+    background-color: #FFFFFF;
+    color: #150B0B;
+    font-size: 1rem;
+    cursor: pointer;
+    box-sizing: border-box;
+    margin: 1rem 0;
+    transition: background-color 0.3s;
 }
 
-/* Ensure the button has the same style as inputs */
 input[type="file"] {
-    display: 
-    none; /* Hide the default file input */
+    display: none;
 }
 
 .special-button {
-    background-color: #7C7A7A; /* Button color */
-    color: #150B0B; /* White text */
+    background-color: #7C7A7A;
+    color: #150B0B;
     border: 2px solid #150B0B;
-    border-radius: 4px; /* Consistent rounding */
-    padding: 0.8rem; /* Uniform padding */
-    cursor: pointer; /* Pointer cursor on hover */
-    transition: background-color 0.3s; /* Smooth transition */
+    border-radius: 4px;
+    padding: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.3s;
 }
 
 .special-button:hover {
-    background-color: #555; /* Darker shade on hover */
+    background-color: #555;
 }
 
 .container {
@@ -87,22 +85,21 @@ input[type="file"] {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Updated color and sizing for inputs and buttons */
 input[type="text"],
 input[type="password"],
-input[type="number"], /* Included for the blur level */
+input[type="number"],
 select, 
 button {
     display: block;
-    width: 100%; /* Same width for all elements */
-    padding: 0.8rem; /* Uniform padding */
-    margin: 1rem 0; /* Consistent margin between elements */
-    border: 2px solid #150B0B; /* Remove borders for a cleaner look */
+    width: 100%;
+    padding: 0.8rem;
+    margin: 1rem 0;
+    border: 2px solid #150B0B;
     border-radius: 4px;
-    background-color: #FFFFFF; /* Set background color to match */
-    color: #150B0B; /* White text for better contrast */
+    background-color: #FFFFFF;
+    color: #150B0B;
     font-size: 1rem;
-    box-sizing: border-box; /* Ensure consistent sizing */
+    box-sizing: border-box;
 }
 
 button {
@@ -110,11 +107,7 @@ button {
 }
 
 button:hover {
-    background-color: #555; /* Darker shade on hover */
-}
-
-input[type="file"] {
-    display: none; /* Hide default file input */
+    background-color: #555;
 }
 
 .custom-file-upload {
@@ -130,10 +123,9 @@ input[type="file"] {
 }
 
 .custom-file-upload:hover {
-    background-color: #555; /* Darker shade on hover */
+    background-color: #555;
 }
 
-/* Styling for links */
 a {
     color: #4b4a4a;
     text-decoration: none;
@@ -143,14 +135,11 @@ a:hover {
     text-decoration: underline;
 }
 
-/* Adjust margins for the result container */
 #resultImage {
     margin-top: 20px;
 }
 
-/* Styling for footer links */
 #footerLinks {
     margin-top: 20px;
     text-align: center;
 }
-

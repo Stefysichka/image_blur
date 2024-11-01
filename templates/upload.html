@@ -9,6 +9,16 @@
 </head>
 <body>
     <h1>Upload Image</h1>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul>
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+    
     <div class="container">
         <div id="uploadContainer">
             <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
@@ -29,6 +39,9 @@
                 <br>
                 <button type="submit" class="special-button">Upload and Blur</button>
             </form>
+            <form action="/clear" method="post" onsubmit="return confirm('Are you sure you want to clear all uploads?');">
+                <button type="submit" class="special-button">Clear All Uploads</button>
+            </form>            
         </div>
 
         <!-- Processing Status -->
@@ -37,17 +50,17 @@
             <progress id="progressBar" value="0" max="100" style="width: 100%;"></progress>
             <button id="cancelBtn" style="display:none;">Cancel</button>
         </div>
-
-        <!-- Result Image -->
-        <div id="resultImage" style="display:none;">
-            <h2>Processed Image:</h2>
-            <img id="processedImage" src="" alt="Processed Image">
-        </div>
     </div> <!-- End of container -->
 
+    <!-- Result Image -->
+    <div id="resultImage" style="display:none;">
+        <h2>Processed Image:</h2>
+        <img id="processedImage" src="" alt="Processed Image">
+    </div>
+
     <div id="footerLinks">
-        <p> <a href="{{ url_for('index') }}">View history here</a></p>
-        <p> <a href="{{ url_for('login') }}">Log out here</a></p>
+        <p><a href="{{ url_for('index') }}">View history here</a></p>
+        <p><a href="{{ url_for('login') }}">Log out here</a></p>
     </div>
     
     <script>
