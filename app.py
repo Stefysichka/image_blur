@@ -3,11 +3,11 @@ import psycopg2
 import os
 from werkzeug.utils import secure_filename
 from PIL import Image, ImageFilter
-import io
 import threading
 import time
 import logging
 from datetime import datetime
+import shutil
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -91,17 +91,23 @@ def process_image(filepath, blur_amount, filter_type):
     image = Image.open(filepath)
     processed_image = image
 
-    task_id = os.path.basename(filepath)  # Unique ID based on the file name
-    image_status[task_id] = {'progress': 0, 'path': None}  # Initialize status
+    task_id = os.path.basename(filepath)
+    image_status[task_id] = {'progress': 0, 'path': None}
+
+    conn = connect_db()
+    cur = conn.cursor()
 
     for i in range(1, blur_amount + 1):
         if cancel_processing:
             image_status[task_id]['progress'] = 'Cancelled'
+            cur.execute("UPDATE uploads SET status=%s WHERE filename=%s", ('Cancelled', task_id))
+            conn.commit()
+            conn.close()
             return None
-        
+
         time.sleep(0.1)
         progress_percentage = int((i / blur_amount) * 100)
-        image_status[task_id]['progress'] = progress_percentage  # Update progress
+        image_status[task_id]['progress'] = progress_percentage
 
         if filter_type == 'gaussian':
             processed_image = processed_image.filter(ImageFilter.GaussianBlur(i))
@@ -111,9 +117,14 @@ def process_image(filepath, blur_amount, filter_type):
     final_image_path = os.path.join(app.config['PROCESSED_FOLDER'], f'processed_{task_id}')
     processed_image.save(final_image_path)
 
-    image_status[task_id] = {'progress': 100, 'path': final_image_path}  # Final status
+    image_status[task_id] = {'progress': 100, 'path': final_image_path}
+    cur.execute("UPDATE uploads SET status=%s WHERE filename=%s", ('Completed', task_id))
+    conn.commit()
+    conn.close()
+
     logging.debug(f'Processed image path: {final_image_path}')
     return final_image_path
+
 
 
 @app.route('/status/<task_id>', methods=['GET'])
@@ -142,12 +153,20 @@ def upload():
             filter_type = request.form.get('filter', type=str)
 
             task_id = filename 
+
+            conn = connect_db()
+            cur = conn.cursor()
+            cur.execute("INSERT INTO uploads (filename, status) VALUES (%s, %s)", (filename, 'Processing'))
+            conn.commit()
+            conn.close()
+
             cancel_processing = False
             processing_thread = threading.Thread(target=process_image, args=(filepath, blur_amount, filter_type))
             processing_thread.start()
 
             return jsonify({'status': 'Processing started', 'task_id': task_id})
     return render_template('upload.html')
+
 
 @app.route('/cancel', methods=['POST'])
 def cancel():
@@ -167,6 +186,28 @@ def show_routes():
     for rule in app.url_map.iter_rules():
         output.append(f"{rule.endpoint}: {rule.rule}")
     return "<br>".join(output)
+
+def clear_uploads():
+    upload_folder = app.config['UPLOAD_FOLDER']
+    processed_folder = app.config['PROCESSED_FOLDER']
+    shutil.rmtree(upload_folder)
+    shutil.rmtree(processed_folder)
+    os.makedirs(upload_folder)
+    os.makedirs(processed_folder)
+    
+@app.route('/clear', methods=['POST'])
+def clear_data():
+    conn = connect_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM uploads;")
+    conn.commit()
+    conn.close()
+    
+    clear_uploads()
+    
+    flash('All uploaded images and records have been cleared.')
+    return redirect(url_for('upload'))
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)
