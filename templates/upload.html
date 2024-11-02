@@ -22,7 +22,7 @@
     <div class="container">
         <div id="uploadContainer">
             <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
-                <label for="file" class="file-label">Choose Photo</label>
+                <label for="file" class="file-label">Choose Photo (Allowed formats: PNG, JPG, JPEG)</label>
                 <label class="custom-file-upload">
                     <input type="file" name="file" id="file" required>
                     Choose here
@@ -44,15 +44,13 @@
             </form>            
         </div>
 
-        <!-- Processing Status -->
         <div id="processingStatus" style="display: none;">
             <p>Processing... <span id="progressPercent">0%</span></p>
             <progress id="progressBar" value="0" max="100" style="width: 100%;"></progress>
             <button id="cancelBtn" style="display:none;">Cancel</button>
         </div>
-    </div> <!-- End of container -->
+    </div>
 
-    <!-- Result Image -->
     <div id="resultImage" style="display:none;">
         <h2>Processed Image:</h2>
         <img id="processedImage" src="" alt="Processed Image">
@@ -64,15 +62,25 @@
     </div>
     
     <script>
-        // Handle the form submission
+        function isValidFileType(file) {
+            const allowedExtensions = ['png', 'jpg', 'jpeg'];
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            return allowedExtensions.includes(fileExtension);
+        }
+
         $('#uploadForm').on('submit', function (e) {
             e.preventDefault();
-    
+
+            const fileInput = $('#file')[0].files[0];
+            if (!isValidFileType(fileInput)) {
+                alert('Invalid file type. Please upload an image in PNG, JPG, or JPEG format.');
+                return;
+            }
+
             var formData = new FormData(this);
             $('#processingStatus').show();
             $('#cancelBtn').show();
-    
-            // Start the upload request
+
             $.ajax({
                 url: '/upload',
                 type: 'POST',
@@ -82,23 +90,20 @@
                 success: function (data) {
                     if (data.task_id) {
                         var taskId = data.task_id;
-    
-                        // Check the status of the processing
                         var interval = setInterval(function () {
                             $.get(`/status/${taskId}`, function (statusData) {
                                 $('#progressPercent').text(statusData.progress + '%');
                                 $('#progressBar').val(statusData.progress);
-    
+
                                 if (statusData.progress >= 100 || !statusData.processing) {
                                     clearInterval(interval);
                                     $('#cancelBtn').hide();
-    
+
                                     if (statusData.image_path) {
                                         $('#processedImage').attr('src', statusData.image_path);
                                         $('#resultImage').show();
                                     }
-    
-                                    // Update the processing message
+
                                     $('#processingStatus p').first().text('Image has been processed successfully.'); // Change text on completion
                                 }
                             });
@@ -106,7 +111,7 @@
                     }
                 }
             });
-    
+
             $('#cancelBtn').on('click', function () {
                 $.post('/cancel', function () {
                     $('#progressPercent').text('Cancelled');
@@ -118,6 +123,5 @@
             });
         });
     </script>
-    
 </body>
 </html>

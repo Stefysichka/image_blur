@@ -8,6 +8,7 @@ import time
 import logging
 from datetime import datetime
 import shutil
+import argparse
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -19,6 +20,7 @@ os.makedirs(app.config['PROCESSED_FOLDER'], exist_ok=True)
 processing_thread = None
 cancel_processing = False
 progress_percentage = 0  
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 image_status = {} 
 
 
@@ -125,8 +127,6 @@ def process_image(filepath, blur_amount, filter_type):
     logging.debug(f'Processed image path: {final_image_path}')
     return final_image_path
 
-
-
 @app.route('/status/<task_id>', methods=['GET'])
 def status(task_id):
     global image_status
@@ -139,32 +139,45 @@ def status(task_id):
         })
     return jsonify({'error': 'Task not found'})
 
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
     global processing_thread, cancel_processing
     if request.method == 'POST':
         file = request.files['file']
         if file:
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
+            try:
+                if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    flash('Invalid file type. Please upload an image in PNG, JPG, JPEG, or GIF format.')
+                    return redirect(url_for('upload'))
 
-            blur_amount = request.form.get('blurLevel', type=int)
-            filter_type = request.form.get('filter', type=str)
+                filename = secure_filename(file.filename)
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
 
-            task_id = filename 
+                blur_amount = request.form.get('blurLevel', type=int)
+                filter_type = request.form.get('filter', type=str)
 
-            conn = connect_db()
-            cur = conn.cursor()
-            cur.execute("INSERT INTO uploads (filename, status) VALUES (%s, %s)", (filename, 'Processing'))
-            conn.commit()
-            conn.close()
+                task_id = filename 
 
-            cancel_processing = False
-            processing_thread = threading.Thread(target=process_image, args=(filepath, blur_amount, filter_type))
-            processing_thread.start()
+                conn = connect_db()
+                cur = conn.cursor()
+                cur.execute("INSERT INTO uploads (filename, status) VALUES (%s, %s)", (filename, 'Processing'))
+                conn.commit()
+                conn.close()
 
-            return jsonify({'status': 'Processing started', 'task_id': task_id})
+                cancel_processing = False
+                processing_thread = threading.Thread(target=process_image, args=(filepath, blur_amount, filter_type))
+                processing_thread.start()
+
+                return jsonify({'status': 'Processing started', 'task_id': task_id})
+
+            except Exception as e:
+                flash('An error occurred while uploading the file. Please try again.')
+                return redirect(url_for('upload'))
     return render_template('upload.html')
 
 
@@ -210,4 +223,8 @@ def clear_data():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8080)
+    parser = argparse.ArgumentParser(description='Run the Flask app.')
+    parser.add_argument('--port', type=int, default=8080, help='Port to run the app on')
+    args = parser.parse_args()
+    
+    app.run(debug=True, port=args.port)
