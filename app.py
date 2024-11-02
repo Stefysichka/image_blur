@@ -8,6 +8,7 @@ import time
 import logging
 from datetime import datetime
 import shutil
+import argparse
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -126,8 +127,6 @@ def process_image(filepath, blur_amount, filter_type):
     logging.debug(f'Processed image path: {final_image_path}')
     return final_image_path
 
-
-
 @app.route('/status/<task_id>', methods=['GET'])
 def status(task_id):
     global image_status
@@ -151,7 +150,7 @@ def upload():
         file = request.files['file']
         if file:
             try:
-                if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
                     flash('Invalid file type. Please upload an image in PNG, JPG, JPEG, or GIF format.')
                     return redirect(url_for('upload'))
 
@@ -224,4 +223,8 @@ def clear_data():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8080)
+    parser = argparse.ArgumentParser(description='Run the Flask app.')
+    parser.add_argument('--port', type=int, default=8080, help='Port to run the app on')
+    args = parser.parse_args()
+    
+    app.run(debug=True, port=args.port)
