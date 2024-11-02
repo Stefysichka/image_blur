@@ -17,12 +17,15 @@ app.config['PROCESSED_FOLDER'] = 'static/processed_images/'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)  
 os.makedirs(app.config['PROCESSED_FOLDER'], exist_ok=True) 
 
+request_queue = []
+processing_lock = threading.Lock()
 processing_thread = None
 cancel_processing = False
 progress_percentage = 0  
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 image_status = {} 
-
+MAX_THREADS = 5
+current_threads = 0 
 
 def connect_db():
     return psycopg2.connect(
@@ -42,6 +45,28 @@ def index():
     tasks = cur.fetchall()
     conn.close()
     return render_template('index.html', tasks=tasks)
+
+def worker():
+    global current_threads
+    while True:
+        filepath = None  # Initialize filepath to None
+        with processing_lock:
+            if request_queue and current_threads < MAX_THREADS:
+                filepath = request_queue.pop(0)  # Get the next file to process
+                current_threads += 1  # Increase the count of active threads
+
+        if filepath:  # Ensure there's a file to process
+            # Process the image (you may need to adapt this part)
+            blur_amount = 1  # Define how you want to set this
+            filter_type = 'gaussian'  # Define how you want to set this
+            process_image(filepath, blur_amount, filter_type)
+
+            with processing_lock:
+                current_threads -= 1
+
+
+worker_thread = threading.Thread(target=worker, daemon=True)
+worker_thread.start()
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -107,7 +132,7 @@ def process_image(filepath, blur_amount, filter_type):
             conn.close()
             return None
 
-        time.sleep(0.1)
+        time.sleep(1)
         progress_percentage = int((i / blur_amount) * 100)
         image_status[task_id]['progress'] = progress_percentage
 
@@ -162,6 +187,18 @@ def upload():
                 filter_type = request.form.get('filter', type=str)
 
                 task_id = filename 
+
+                with processing_lock:
+                    request_queue.append(filepath)
+                    if len(request_queue) >= MAX_THREADS:  
+                        estimated_wait_time = len(request_queue) * 10  
+                        return jsonify({
+                            'status': 'queued',
+                            'estimated_wait_time': estimated_wait_time,
+                            'message': 'Your request has been queued. You will be informed when processing has started.'
+                        }), 202 
+                    request_queue.append(filepath)
+
 
                 conn = connect_db()
                 cur = conn.cursor()
@@ -221,6 +258,10 @@ def clear_data():
     flash('All uploaded images and records have been cleared.')
     return redirect(url_for('upload'))
 
+def process_request(filepath):
+    process_image(filepath)
+    with processing_lock:
+        request_queue.remove(filepath)  
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run the Flask app.')
